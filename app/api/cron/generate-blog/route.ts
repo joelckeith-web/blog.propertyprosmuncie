@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchWeeklyForecast } from "@/lib/weather";
+import { buildWeatherContext } from "@/lib/weather";
 import { generateBlogPost } from "@/lib/content-generator";
-import { pushBlogToDev } from "@/lib/github";
+import { pushBlogToMain } from "@/lib/github";
+import { notifyGoogleIndexing } from "@/lib/google-indexing";
+import { siteConfig } from "@/lib/site-config";
 
 /**
  * Vercel Cron endpoint — triggers weekly blog generation.
  * Schedule: Every Sunday at 5:00 PM ET (configured in vercel.json)
  *
  * Flow:
- * 1. Fetch 7-day weather forecast from NWS API
- * 2. Generate blog post via Claude API
- * 3. Push draft to `dev` branch on GitHub
- * 4. Human reviews and merges to `main` → Vercel auto-deploys
+ * 1. Fetch historical weather (past 48h) + 7-day forecast from NWS API
+ * 2. Classify weather mode (pre-event / post-event / combined)
+ * 3. Generate blog post via Claude API with mode-specific prompts
+ * 4. Push directly to `main` branch on GitHub → Vercel auto-deploys
+ * 5. Ping Google Indexing API for fast crawl (if configured)
  */
 export async function GET(request: NextRequest) {
   // Verify cron secret to prevent unauthorized access
@@ -25,22 +28,34 @@ export async function GET(request: NextRequest) {
   try {
     console.log("🌦️ Starting weekly blog generation...");
 
-    // Step 1: Fetch weather
-    console.log("📡 Fetching Muncie weather forecast...");
-    const forecast = await fetchWeeklyForecast();
+    // Step 1: Build full weather context (historical + forecast + mode)
+    console.log("📡 Fetching Muncie weather data (historical + forecast)...");
+    const weatherContext = await buildWeatherContext();
     console.log(
-      `✅ Forecast fetched: ${forecast.summary.dominantCondition}, ${forecast.summary.highTemp}°F high`
+      `✅ Weather context built: mode=${weatherContext.mode}, hazard=${weatherContext.dominantHazard}`
     );
+    console.log(`   Historical: ${weatherContext.historicalSummary}`);
+    console.log(`   Forecast: ${weatherContext.forecastSummary}`);
 
-    // Step 2: Generate blog post
-    console.log("✍️ Generating blog content via Claude...");
-    const blog = await generateBlogPost(forecast);
+    // Step 2: Generate blog post with mode-specific content
+    console.log(`✍️ Generating ${weatherContext.mode} blog content via Claude...`);
+    const blog = await generateBlogPost(weatherContext);
     console.log(`✅ Blog generated: "${blog.frontmatter.title}"`);
 
-    // Step 3: Push to dev branch
-    console.log("📤 Pushing draft to dev branch...");
-    const result = await pushBlogToDev(blog);
+    // Step 3: Push directly to main branch
+    console.log("📤 Pushing to main branch (auto-deploy)...");
+    const result = await pushBlogToMain(blog);
     console.log(`✅ Pushed to ${result.branch}: ${result.commitUrl}`);
+
+    // Step 4: Ping Google Indexing API (optional — skips if not configured)
+    const pageUrl = `${siteConfig.blogUrl}/${blog.frontmatter.slug}`;
+    console.log(`🔍 Pinging Google Indexing API for: ${pageUrl}`);
+    const indexResult = await notifyGoogleIndexing(pageUrl);
+    if (indexResult.success) {
+      console.log("✅ Google Indexing API notified successfully");
+    } else {
+      console.log(`ℹ️ Google Indexing: ${indexResult.error}`);
+    }
 
     return NextResponse.json({
       success: true,
@@ -48,15 +63,17 @@ export async function GET(request: NextRequest) {
         title: blog.frontmatter.title,
         slug: blog.frontmatter.slug,
         category: blog.frontmatter.category,
+        weatherMode: weatherContext.mode,
         weatherWeek: blog.frontmatter.weatherWeek,
-        weatherCondition: forecast.summary.dominantCondition,
+        dominantHazard: weatherContext.dominantHazard,
       },
       git: {
         branch: result.branch,
         commitUrl: result.commitUrl,
         filePath: result.filePath,
       },
-      message: `Blog draft pushed to '${result.branch}' branch. Review and merge to 'main' to publish.`,
+      indexing: indexResult,
+      message: `Blog auto-published to '${result.branch}'. Vercel will deploy automatically.`,
     });
   } catch (error: unknown) {
     console.error("❌ Blog generation failed:", error);

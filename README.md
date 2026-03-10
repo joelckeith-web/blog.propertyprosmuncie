@@ -5,11 +5,12 @@ Automated blog content generation system for [Property Pros Muncie](https://www.
 ## How It Works
 
 1. **Every Sunday at 5 PM ET**, a Vercel Cron job triggers the pipeline
-2. **Weather data** is fetched from the National Weather Service API for Muncie, IN
-3. **Claude AI** generates a 1,500–2,200 word blog post following the ASP Branding SOP
-4. **The draft** is pushed to the `dev` branch on GitHub
-5. **A human reviews** the draft and merges to `main`
-6. **Vercel auto-deploys** the updated blog
+2. **Historical weather** (past 48 hours) and **7-day forecast** are fetched from the NWS API
+3. **Weather mode** is classified as `pre-event`, `post-event`, or `combined`
+4. **Claude AI** generates a 1,500–2,200 word mode-specific blog post
+5. **The post** is pushed directly to `main` on GitHub — no human review needed
+6. **Vercel auto-deploys** within ~60 seconds
+7. **Google Indexing API** pings Google for fast crawling (optional)
 
 ## Tech Stack
 
@@ -17,8 +18,9 @@ Automated blog content generation system for [Property Pros Muncie](https://www.
 - **Tailwind CSS** with @tailwindcss/typography
 - **Anthropic Claude API** for content generation
 - **NWS API** for weather data (free, no key needed)
-- **GitHub API** for automated commits
-- **Vercel** for hosting and cron jobs
+- **GitHub API** for automated commits to `main`
+- **Vercel** for hosting and cron jobs (Pro plan)
+- **Google Indexing API** for instant index pinging (optional)
 
 ## Quick Start
 
@@ -29,7 +31,7 @@ cp .env.example .env.local
 
 npm run dev          # Start dev server
 npm run generate     # Generate a blog post locally
-npm run generate:push # Generate and push to dev branch
+npm run generate:push # Generate and push to main branch
 ```
 
 ## Project Structure
@@ -46,20 +48,21 @@ npm run generate:push # Generate and push to dev branch
 │   ├── Header.tsx          # Site header matching parent site
 │   ├── Footer.tsx          # Site footer matching parent site
 │   ├── BlogCard.tsx        # Blog post preview card
-│   └── SchemaMarkup.tsx    # JSON-LD structured data
-├── content/posts/          # Markdown blog posts
-│   ├── drafts/             # AI-generated drafts
-│   └── published/          # Approved and published posts
+│   ├── SchemaMarkup.tsx    # JSON-LD structured data (Article, FAQ, LocalBusiness)
+│   ├── AISummaryBox.tsx    # Styled summary callout (AEO optimization)
+│   └── ServiceAreaFooter.tsx # Hyper-local geo-anchor links
+├── content/posts/          # Markdown blog posts (auto-published)
 ├── docs/                   # Setup documentation
 │   ├── SETUP-SOP.md        # Full deployment SOP
 │   └── CNAME-DNS-SETUP.md  # Subdomain DNS guide
 ├── lib/                    # Core libraries
 │   ├── blog.ts             # Blog post reading/parsing
-│   ├── content-generator.ts # AI content generation
-│   ├── github.ts           # GitHub API integration
-│   ├── site-config.ts      # Verified site configuration
+│   ├── content-generator.ts # AI content generation (mode-aware)
+│   ├── github.ts           # GitHub API (push to main)
+│   ├── google-indexing.ts  # Google Indexing API integration
+│   ├── site-config.ts      # Site config (sameAs, neighborhoods, services)
 │   ├── types.ts            # TypeScript interfaces
-│   └── weather.ts          # NWS weather API
+│   └── weather.ts          # NWS weather API (historical + forecast)
 ├── scripts/
 │   └── generate-blog.ts    # Manual generation script
 ├── styles/globals.css      # Tailwind + custom styles
@@ -74,11 +77,25 @@ npm run generate:push # Generate and push to dev branch
 ## Workflow
 
 ```
-Cron (Sunday 5PM) → Weather API → Claude AI → GitHub dev branch
-                                                    ↓
-                                            Human reviews draft
-                                                    ↓
-                                            Merge dev → main
-                                                    ↓
-                                          Vercel auto-deploys
+Cron (Sunday 5PM ET)
+        ↓
+NWS API → Historical (48h) + 7-day Forecast
+        ↓
+Weather Mode Classification (pre/post/combined)
+        ↓
+Claude AI → Mode-specific Blog Post
+        ↓
+GitHub Push → main branch
+        ↓
+Vercel Auto-Deploy (~60s)
+        ↓
+Google Indexing API Ping (optional)
 ```
+
+## SEO Features
+
+- **Entity Bridge** — `sameAs` array in LocalBusiness schema linking blog to Google Maps, Facebook, BBB
+- **AI Summary Box** — 75-100 word direct-answer callout optimized for AI Overviews
+- **Service Area Geo-Footer** — Hyper-local anchor text for neighborhood-level signals
+- **Automated Indexing** — Google Indexing API for minutes-not-days crawling
+- **Full Schema Markup** — Article, FAQPage, LocalBusiness, BreadcrumbList JSON-LD

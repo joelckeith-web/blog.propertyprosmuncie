@@ -21,6 +21,16 @@ export const siteConfig = {
   description:
     "Premier General Contractor in Muncie, IN — Licensed, Insured, Local",
 
+  /**
+   * Entity Bridge — sameAs array for LocalBusiness schema.
+   * Links the blog subdomain back to the verified business entity.
+   */
+  sameAs: [
+    "https://www.google.com/maps?cid=12767127311539766294",
+    "https://www.facebook.com/PropertyProsMuncie",
+    "https://www.linkedin.com/company/property-pros-muncie",
+  ],
+
   /** Verified service areas from the website */
   serviceAreas: [
     "Muncie",
@@ -32,6 +42,28 @@ export const siteConfig = {
     "Albany",
     "Delaware County",
     "East Central Indiana",
+  ],
+
+  /**
+   * Muncie neighborhoods / hyper-local areas for geo-anchor footer links.
+   * Used by the Service Area Footer component for geographic silhouette SEO.
+   */
+  neighborhoods: [
+    { name: "Near Northside", city: "Muncie" },
+    { name: "Westside", city: "Muncie" },
+    { name: "South Muncie", city: "Muncie" },
+    { name: "Whitely", city: "Muncie" },
+    { name: "Industry", city: "Muncie" },
+    { name: "Normal City", city: "Muncie" },
+    { name: "Shedtown", city: "Muncie" },
+    { name: "Downtown Muncie", city: "Muncie" },
+    { name: "Yorktown", city: "Yorktown" },
+    { name: "Daleville", city: "Daleville" },
+    { name: "Albany", city: "Albany" },
+    { name: "Eaton", city: "Eaton" },
+    { name: "Selma", city: "Selma" },
+    { name: "Gaston", city: "Gaston" },
+    { name: "Cowan", city: "Cowan" },
   ],
 
   /**
@@ -102,9 +134,13 @@ export const weatherServiceMap: Record<
   { services: string[]; priority: number }
 > = {
   storm: { services: ["roofing", "siding", "gutters"], priority: 1 },
+  storm_damage: { services: ["roofing", "siding", "gutters"], priority: 1 },
   high_wind: { services: ["roofing", "siding", "fencing"], priority: 1 },
+  wind_damage: { services: ["roofing", "siding", "fencing"], priority: 1 },
   heavy_rain: { services: ["gutters", "roofing"], priority: 2 },
+  water_damage: { services: ["gutters", "roofing"], priority: 2 },
   hail: { services: ["roofing", "siding"], priority: 1 },
+  hail_damage: { services: ["roofing", "siding"], priority: 1 },
   freeze_thaw: {
     services: ["roofing", "fencing", "construction"],
     priority: 2,

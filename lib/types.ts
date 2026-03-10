@@ -1,3 +1,6 @@
+/** Weather mode — derived from historical + forecast analysis */
+export type WeatherMode = "pre-event" | "post-event" | "combined";
+
 /** Blog post frontmatter schema */
 export interface BlogFrontmatter {
   title: string;
@@ -17,13 +20,20 @@ export interface BlogFrontmatter {
   metaTitle: string; // 50-60 chars
   metaDescription: string; // 150-160 chars
   weatherTriggered: boolean;
+  weatherMode: WeatherMode;
   weatherWeek: string; // e.g. "March 10–16, 2026"
   featuredImage: string;
+  serviceAreaFooterLinks: ServiceAreaLink[];
   schema: {
     type: "Article" | "BlogPosting";
     faqItems: FaqItem[];
   };
-  status: "draft" | "approved" | "published";
+  status: "draft" | "published";
+}
+
+export interface ServiceAreaLink {
+  label: string; // e.g. "Roof Repair in Muncie's Near Northside"
+  url: string; // verified service page URL
 }
 
 export interface FaqItem {
@@ -59,6 +69,25 @@ export interface WeatherPeriod {
   detailedForecast: string;
 }
 
+/** NWS observation from past 48 hours */
+export interface WeatherObservation {
+  timestamp: string;
+  temperature: number | null; // °F
+  windSpeed: number | null; // mph
+  windGust: number | null; // mph
+  precipitationLastHour: number | null; // inches
+  description: string;
+}
+
+/** Historical weather summary (past 48 hours) */
+export interface HistoricalWeather {
+  totalPrecipitation: number; // inches
+  peakWindGust: number; // mph
+  hadSevereWeather: boolean;
+  severeEvents: string[];
+  summary: string;
+}
+
 export interface WeeklyForecast {
   location: string;
   fetchedAt: string;
@@ -91,17 +120,21 @@ export interface WeatherSummary {
   weatherStory: string;
 }
 
+/** Full weather context — combines historical + forecast + mode */
+export interface WeatherContext {
+  mode: WeatherMode;
+  historical: HistoricalWeather;
+  forecast: WeeklyForecast;
+  historicalSummary: string;
+  forecastSummary: string;
+  dominantHazard: string;
+  affectedServices: string[];
+  weekLabel: string;
+}
+
 /** Content generation types */
 export interface GeneratedBlog {
   frontmatter: BlogFrontmatter;
   markdownContent: string;
   filePath: string;
-}
-
-/** Approval token payload */
-export interface ApprovalTokenPayload {
-  slug: string;
-  action: "approve" | "reject";
-  iat: number;
-  exp: number;
 }

@@ -6,6 +6,7 @@ import {
   BreadcrumbSchema,
 } from "@/components/SchemaMarkup";
 import BlogCard from "@/components/BlogCard";
+import ServiceAreaFooter from "@/components/ServiceAreaFooter";
 import { siteConfig } from "@/lib/site-config";
 import type { Metadata } from "next";
 
@@ -115,7 +116,11 @@ export default async function BlogPostPage({ params }: PageProps) {
               </span>
               {post.frontmatter.weatherTriggered && (
                 <span className="text-sm text-brand-orange">
-                  ⛅ Weather Report: {post.frontmatter.weatherWeek}
+                  ⛅ {post.frontmatter.weatherMode === "post-event"
+                    ? "Post-Storm Report"
+                    : post.frontmatter.weatherMode === "combined"
+                      ? "Weather Advisory"
+                      : "Weather Forecast"}: {post.frontmatter.weatherWeek}
                 </span>
               )}
             </div>
@@ -132,10 +137,20 @@ export default async function BlogPostPage({ params }: PageProps) {
           <div className="lg:flex lg:gap-12">
             {/* Main content */}
             <div className="lg:flex-1 min-w-0">
+              {/* The AI Summary Box is rendered as a styled blockquote within
+                  the Markdown content. The CSS in globals.css styles
+                  blockquotes with the "Immediate Action Summary" heading. */}
               <div
                 className="prose prose-lg max-w-none"
                 dangerouslySetInnerHTML={{ __html: post.content }}
               />
+
+              {/* Service Area Geo-Link Footer */}
+              {post.frontmatter.serviceAreaFooterLinks?.length > 0 && (
+                <ServiceAreaFooter
+                  links={post.frontmatter.serviceAreaFooterLinks}
+                />
+              )}
 
               {/* FAQ section */}
               {post.frontmatter.schema?.faqItems?.length > 0 && (

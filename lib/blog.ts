@@ -6,8 +6,7 @@ import html from "remark-html";
 import readingTime from "reading-time";
 import type { BlogPost, BlogFrontmatter } from "./types";
 
-const POSTS_DIR = path.join(process.cwd(), "content/posts/published");
-const DRAFTS_DIR = path.join(process.cwd(), "content/posts/drafts");
+const POSTS_DIR = path.join(process.cwd(), "content/posts");
 
 /**
  * Get all published blog posts, sorted by date (newest first).

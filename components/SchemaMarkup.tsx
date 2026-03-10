@@ -3,7 +3,8 @@ import type { BlogPost, FaqItem } from "@/lib/types";
 
 /**
  * JSON-LD structured data components for SEO.
- * Implements Article, FAQPage, LocalBusiness, and BreadcrumbList schemas.
+ * Implements Article, FAQPage, LocalBusiness (with sameAs Entity Bridge),
+ * BreadcrumbList, and WebSite schemas.
  */
 
 /** Article schema for blog posts */
@@ -71,7 +72,14 @@ export function FaqSchema({ items }: { items: FaqItem[] }) {
   );
 }
 
-/** LocalBusiness schema — included on every page */
+/**
+ * LocalBusiness schema — included on every page.
+ *
+ * ENTITY BRIDGE: The `sameAs` array links this blog subdomain to the
+ * verified business profiles (Google Maps CID, Facebook, BBB, LinkedIn).
+ * This tells Google "this subdomain IS Property Pros Muncie" and transfers
+ * entity authority to the blog.
+ */
 export function LocalBusinessSchema() {
   const schema = {
     "@context": "https://schema.org",
@@ -92,9 +100,8 @@ export function LocalBusinessSchema() {
       "@type": "City",
       name: area,
     })),
-    sameAs: [siteConfig.social.facebook, siteConfig.social.linkedin].filter(
-      Boolean
-    ),
+    // Entity Bridge — sameAs array linking to verified business profiles
+    sameAs: siteConfig.sameAs,
   };
 
   return (

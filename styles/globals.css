@@ -41,6 +41,18 @@
     @apply border-l-4 border-brand-orange bg-gray-50 py-1 px-4 italic;
   }
 
+  /* AI Summary Box — styled blockquote for AEO optimization.
+     The content generator outputs this as a Markdown blockquote
+     with "**Immediate Action Summary for Muncie Homeowners**" as the
+     first bold element. This CSS makes it visually distinct. */
+  .prose blockquote:first-of-type {
+    @apply not-italic rounded-lg border-l-4 border-brand-orange bg-brand-orange-light p-6 my-8;
+  }
+
+  .prose blockquote:first-of-type strong:first-child {
+    @apply block text-lg font-bold text-brand-dark mb-2;
+  }
+
   .prose img {
     @apply rounded-lg shadow-md;
   }

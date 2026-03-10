@@ -2,8 +2,8 @@ import { Octokit } from "@octokit/rest";
 import type { GeneratedBlog } from "./types";
 
 /**
- * Push a generated blog draft to the `dev` branch on GitHub.
- * Human reviews on `dev`, then merges to `main` to trigger Vercel deploy.
+ * Push a generated blog post directly to the `main` branch on GitHub.
+ * Vercel auto-deploys from main — NO human-in-the-loop.
  */
 
 function getOctokit(): Octokit {
@@ -15,52 +15,16 @@ function getOctokit(): Octokit {
 function getRepoConfig() {
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
-  const branch = process.env.GITHUB_BRANCH || "dev";
+  const branch = process.env.GITHUB_BRANCH || "main";
   if (!owner || !repo) throw new Error("GITHUB_OWNER and GITHUB_REPO must be set");
   return { owner, repo, branch };
 }
 
 /**
- * Ensure the `dev` branch exists. If not, create it from `main`.
+ * Push a blog post markdown file directly to main branch.
+ * Vercel will auto-deploy on push.
  */
-async function ensureDevBranch(
-  octokit: Octokit,
-  owner: string,
-  repo: string,
-  branch: string
-): Promise<string> {
-  try {
-    // Try to get the dev branch
-    const { data } = await octokit.git.getRef({
-      owner,
-      repo,
-      ref: `heads/${branch}`,
-    });
-    return data.object.sha;
-  } catch (error: unknown) {
-    // Branch doesn't exist — create from main
-    const { data: mainRef } = await octokit.git.getRef({
-      owner,
-      repo,
-      ref: "heads/main",
-    });
-
-    await octokit.git.createRef({
-      owner,
-      repo,
-      ref: `refs/heads/${branch}`,
-      sha: mainRef.object.sha,
-    });
-
-    console.log(`Created branch '${branch}' from main at ${mainRef.object.sha}`);
-    return mainRef.object.sha;
-  }
-}
-
-/**
- * Push a blog post markdown file to the dev branch.
- */
-export async function pushBlogToDev(blog: GeneratedBlog): Promise<{
+export async function pushBlogToMain(blog: GeneratedBlog): Promise<{
   commitUrl: string;
   filePath: string;
   branch: string;
@@ -68,10 +32,7 @@ export async function pushBlogToDev(blog: GeneratedBlog): Promise<{
   const octokit = getOctokit();
   const { owner, repo, branch } = getRepoConfig();
 
-  // Ensure dev branch exists
-  await ensureDevBranch(octokit, owner, repo, branch);
-
-  // Get the current commit SHA of the dev branch
+  // Get the current commit SHA of the target branch
   const { data: refData } = await octokit.git.getRef({
     owner,
     repo,
@@ -111,7 +72,7 @@ export async function pushBlogToDev(blog: GeneratedBlog): Promise<{
   });
 
   // Create the commit
-  const commitMessage = `📝 New blog draft: ${blog.frontmatter.title}\n\nWeather-triggered: ${blog.frontmatter.weatherTriggered}\nWeek: ${blog.frontmatter.weatherWeek}\nCategory: ${blog.frontmatter.category}\n\nAuto-generated — review and merge to main to publish.`;
+  const commitMessage = `📝 Auto-publish: ${blog.frontmatter.title}\n\nWeather mode: ${blog.frontmatter.weatherMode}\nWeek: ${blog.frontmatter.weatherWeek}\nCategory: ${blog.frontmatter.category}\n\nAutomated weather-triggered blog post — direct to main.`;
 
   const { data: newCommit } = await octokit.git.createCommit({
     owner,
@@ -121,7 +82,7 @@ export async function pushBlogToDev(blog: GeneratedBlog): Promise<{
     parents: [latestCommitSha],
   });
 
-  // Update the dev branch reference
+  // Update the branch reference
   await octokit.git.updateRef({
     owner,
     repo,
@@ -137,27 +98,4 @@ export async function pushBlogToDev(blog: GeneratedBlog): Promise<{
     filePath: blog.filePath,
     branch,
   };
-}
-
-/**
- * List pending blog drafts on the dev branch (not yet merged to main).
- */
-export async function listPendingDrafts(): Promise<string[]> {
-  const octokit = getOctokit();
-  const { owner, repo, branch } = getRepoConfig();
-
-  try {
-    const { data } = await octokit.repos.compareCommits({
-      owner,
-      repo,
-      base: "main",
-      head: branch,
-    });
-
-    return data.files
-      ?.filter((f) => f.filename.startsWith("content/posts/") && f.status === "added")
-      .map((f) => f.filename) || [];
-  } catch {
-    return [];
-  }
 }

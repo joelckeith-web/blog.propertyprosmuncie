@@ -1,5 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { WeeklyForecast, BlogFrontmatter, GeneratedBlog } from "./types";
+import type {
+  WeatherContext,
+  WeatherMode,
+  BlogFrontmatter,
+  GeneratedBlog,
+  ServiceAreaLink,
+} from "./types";
 import { siteConfig } from "./site-config";
 
 const anthropic = new Anthropic({
@@ -7,23 +13,26 @@ const anthropic = new Anthropic({
 });
 
 /**
- * Generate a weather-triggered blog post from the weekly forecast.
+ * Generate a weather-triggered blog post from the full weather context.
  * Enforces ASP Branding Core Content Creation SOP requirements.
+ *
+ * Now supports three modes:
+ * - pre-event:  Preparation-focused ("storms are coming, protect your home")
+ * - post-event: Recovery-focused  ("storms hit, here's what to do now")
+ * - combined:   Both past damage AND more weather incoming
  */
 export async function generateBlogPost(
-  forecast: WeeklyForecast
+  context: WeatherContext
 ): Promise<GeneratedBlog> {
-  const { summary } = forecast;
-  const primaryService = summary.relevantServices[0];
-  const serviceConfig =
-    siteConfig.services[primaryService as keyof typeof siteConfig.services];
+  const primaryService = context.affectedServices[0];
 
-  // Build the list of verified internal links the AI can use
+  // Build verified internal links + geo-anchor footer links
   const internalLinks = buildInternalLinksContext();
+  const geoFooterLinks = buildGeoFooterLinks(primaryService);
 
-  // Build the prompt enforcing all SOP rules
-  const systemPrompt = buildSystemPrompt();
-  const userPrompt = buildUserPrompt(forecast, internalLinks);
+  // Build mode-specific prompts
+  const systemPrompt = buildSystemPrompt(context.mode);
+  const userPrompt = buildUserPrompt(context, internalLinks, geoFooterLinks);
 
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
@@ -36,13 +45,22 @@ export async function generateBlogPost(
     response.content[0].type === "text" ? response.content[0].text : "";
 
   // Parse the structured response
-  const parsed = parseGeneratedContent(rawContent, forecast, primaryService);
+  const parsed = parseGeneratedContent(rawContent, context, primaryService, geoFooterLinks);
 
   return parsed;
 }
 
-function buildSystemPrompt(): string {
+// ═══════════════════════════════════════════════════════════
+//  SYSTEM PROMPT — mode-aware
+// ═══════════════════════════════════════════════════════════
+
+function buildSystemPrompt(mode: WeatherMode): string {
+  const modeInstructions = getModeInstructions(mode);
+
   return `You are a professional SEO content writer for ${siteConfig.name}, a premier general contractor in ${siteConfig.address.city}, ${siteConfig.address.state}. You write weather-triggered blog posts that connect real local weather conditions to home maintenance and improvement services.
+
+CONTENT MODE: ${mode.toUpperCase()}
+${modeInstructions}
 
 STRICT CONTENT RULES (ASP Branding Core Content Creation SOP):
 1. Write exactly 1,500–2,200 words of verified, substantive content. No filler.
@@ -54,9 +72,17 @@ STRICT CONTENT RULES (ASP Branding Core Content Creation SOP):
 7. Include 6 or more FAQ items at the end, structured for FAQPage schema.
 8. Do NOT fabricate statistics, credentials, certifications, or customer stories.
 9. Reference ${siteConfig.address.city}, ${siteConfig.address.state} and service areas by name.
-10. Reference the ACTUAL forecast for the specific week with specific dates.
+10. Reference the ACTUAL weather data (historical and/or forecast) with specific dates.
 11. Include a CTA paragraph at the end with phone number ${siteConfig.phone}.
 12. Write in a professional but approachable tone — like a knowledgeable neighbor.
+
+CRITICAL — IMMEDIATE ACTION SUMMARY BOX:
+Your FIRST content after the intro paragraph MUST be a summary box block formatted EXACTLY like this:
+
+> **Immediate Action Summary for Muncie Homeowners**
+> [Write a 75–100 word summary that directly answers the implied search query. This text must be self-contained, factual, and parseable by AI Overview systems. Include the business name, city, specific weather condition, and recommended action. Do NOT use marketing fluff — write like a factual advisory.]
+
+This summary box is critical for AI Overview / Answer Engine Optimization (AEO). It must appear within the first 2 scroll-lengths of the page.
 
 OUTPUT FORMAT — respond with EXACTLY this structure (use the delimiters precisely):
 
@@ -76,14 +102,49 @@ OUTPUT FORMAT — respond with EXACTLY this structure (use the delimiters precis
 [Full Markdown blog post content starting with intro paragraph, NOT the H1]`;
 }
 
-function buildUserPrompt(
-  forecast: WeeklyForecast,
-  internalLinks: string
-): string {
-  const { summary, weekRange, periods } = forecast;
+function getModeInstructions(mode: WeatherMode): string {
+  switch (mode) {
+    case "post-event":
+      return `POST-EVENT MODE: Significant weather has ALREADY occurred in the past 48 hours.
+- Lead with what happened: reference the actual historical weather data (precipitation totals, wind gusts, severe events).
+- Focus on DAMAGE ASSESSMENT and RECOVERY — what should homeowners check NOW?
+- Use urgency: "If you experienced [weather], your [roof/siding/gutters] may already be compromised."
+- Frame Property Pros as the immediate solution — "Call today before damage worsens."
+- Still reference the upcoming forecast if relevant weather continues.
+- Post-event content typically converts higher because homeowners are actively searching for help.`;
 
-  // Build a readable forecast summary
-  const forecastDetails = periods
+    case "combined":
+      return `COMBINED MODE: Significant weather ALREADY hit AND more is coming.
+- Open by acknowledging recent damage: reference historical weather data.
+- Pivot to urgency: "And there's more on the way this week."
+- Structure: (1) What happened → (2) What to check now → (3) What's coming → (4) How to prepare.
+- This is the highest-urgency content mode. Homeowners need immediate action AND preparation.
+- Frame Property Pros as the urgent-response partner.`;
+
+    case "pre-event":
+    default:
+      return `PRE-EVENT MODE: No significant recent weather, but the forecast shows conditions ahead.
+- Focus on PREPARATION and PREVENTION.
+- Reference specific forecast data: what's coming and when.
+- Guide homeowners on what to inspect, repair, or reinforce BEFORE the weather arrives.
+- Frame Property Pros as the proactive partner — "Don't wait until after the storm."
+- Seasonal maintenance angles work well in this mode.`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  USER PROMPT — includes historical + forecast + geo links
+// ═══════════════════════════════════════════════════════════
+
+function buildUserPrompt(
+  context: WeatherContext,
+  internalLinks: string,
+  geoFooterLinks: ServiceAreaLink[]
+): string {
+  const { mode, historical, forecast } = context;
+
+  // Build forecast day-by-day details
+  const forecastDetails = forecast.periods
     .filter((p) => p.isDaytime)
     .slice(0, 7)
     .map(
@@ -99,29 +160,53 @@ function buildUserPrompt(
           .join("\n")
       : "No active weather alerts.";
 
-  return `Write a weather-triggered blog post for the week of ${weekRange}.
+  // Build geo-footer instructions
+  const geoFooterText = geoFooterLinks
+    .map((link) => `- [${link.label}](${link.url})`)
+    .join("\n");
 
-WEATHER FORECAST FOR MUNCIE, IN:
+  // Historical weather section (for post-event / combined modes)
+  const historicalSection =
+    mode === "pre-event"
+      ? ""
+      : `
+HISTORICAL WEATHER (PAST 48 HOURS):
+- Total precipitation: ${historical.totalPrecipitation} inches
+- Peak wind gust: ${historical.peakWindGust} mph
+- Severe weather occurred: ${historical.hadSevereWeather ? "YES" : "No"}
+${historical.severeEvents.length > 0 ? `- Severe events: ${historical.severeEvents.join(", ")}` : ""}
+- Summary: ${historical.summary}
+
+⚠️ You MUST reference these historical weather facts in the opening paragraphs. This is real data.
+`;
+
+  return `Write a ${mode.toUpperCase()} weather-triggered blog post for the week of ${context.weekLabel}.
+
+CONTENT MODE: ${mode}
+${historicalSection}
+7-DAY FORECAST FOR MUNCIE, IN:
 ${forecastDetails}
 
-WEATHER SUMMARY:
-- Dominant condition: ${summary.dominantCondition}
-- Temperature range: ${summary.lowTemp}°F to ${summary.highTemp}°F
-- Precipitation days: ${summary.precipitationDays}
-- Storm risk: ${summary.stormRisk}
-- Freeze risk: ${summary.freezeRisk}
-- Hail risk: ${summary.hailRisk}
-- High wind risk: ${summary.highWindRisk}
-- Heavy rain risk: ${summary.heavyRainRisk}
+FORECAST SUMMARY:
+- Dominant condition: ${forecast.summary.dominantCondition}
+- Temperature range: ${forecast.summary.lowTemp}°F to ${forecast.summary.highTemp}°F
+- Precipitation days: ${forecast.summary.precipitationDays}
+- Storm risk: ${forecast.summary.stormRisk}
+- Freeze risk: ${forecast.summary.freezeRisk}
+- Hail risk: ${forecast.summary.hailRisk}
+- High wind risk: ${forecast.summary.highWindRisk}
+- Heavy rain risk: ${forecast.summary.heavyRainRisk}
+
+DOMINANT HAZARD: ${context.dominantHazard}
 
 ACTIVE ALERTS:
 ${alertsText}
 
 WEATHER STORY:
-${summary.weatherStory}
+${context.forecastSummary}
 
-PRIMARY SERVICE FOCUS: ${summary.relevantServices[0]}
-SECONDARY SERVICES: ${summary.relevantServices.slice(1).join(", ")}
+PRIMARY SERVICE FOCUS: ${context.affectedServices[0]}
+SECONDARY SERVICES: ${context.affectedServices.slice(1).join(", ")}
 
 VERIFIED INTERNAL LINKS (use 4+ of these — ONLY these URLs):
 ${internalLinks}
@@ -142,22 +227,44 @@ BUSINESS INFO:
 - Service areas: ${siteConfig.serviceAreas.join(", ")}
 - Contact page: ${siteConfig.pages.contact}
 
+SERVICE AREA GEO-LINK FOOTER — Include this EXACTLY at the end of the post, before the FAQ section:
+
+### Serving Muncie & Surrounding Communities
+${geoFooterText}
+
 Generate the blog post now following all SOP rules and the exact output format specified.`;
 }
+
+// ═══════════════════════════════════════════════════════════
+//  GEO-ANCHOR FOOTER LINKS
+// ═══════════════════════════════════════════════════════════
+
+function buildGeoFooterLinks(primaryService: string): ServiceAreaLink[] {
+  const serviceConfig =
+    siteConfig.services[primaryService as keyof typeof siteConfig.services];
+  const serviceLabel = serviceConfig?.label || "Home Services";
+  const serviceUrl = serviceConfig?.url || siteConfig.pages.services;
+
+  return siteConfig.neighborhoods.map((n) => ({
+    label: `${serviceLabel} in ${n.city === "Muncie" ? `Muncie's ${n.name}` : n.name}`,
+    url: serviceUrl,
+  }));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INTERNAL LINKS CONTEXT
+// ═══════════════════════════════════════════════════════════
 
 function buildInternalLinksContext(): string {
   const links: string[] = [];
 
-  // Add all main service pages
-  for (const [key, service] of Object.entries(siteConfig.services)) {
+  for (const [, service] of Object.entries(siteConfig.services)) {
     links.push(`- ${service.label}: ${service.url}`);
-    // Add subpages
     for (const [subKey, subUrl] of Object.entries(service.subpages)) {
       links.push(`  - ${subKey}: ${subUrl}`);
     }
   }
 
-  // Add key pages
   links.push(`- About Us: ${siteConfig.pages.about}`);
   links.push(`- Services Overview: ${siteConfig.pages.services}`);
   links.push(`- Gallery: ${siteConfig.pages.gallery}`);
@@ -167,13 +274,15 @@ function buildInternalLinksContext(): string {
   return links.join("\n");
 }
 
-/**
- * Parse the AI's structured response into frontmatter + content.
- */
+// ═══════════════════════════════════════════════════════════
+//  RESPONSE PARSER
+// ═══════════════════════════════════════════════════════════
+
 function parseGeneratedContent(
   raw: string,
-  forecast: WeeklyForecast,
-  primaryService: string
+  context: WeatherContext,
+  primaryService: string,
+  geoFooterLinks: ServiceAreaLink[]
 ): GeneratedBlog {
   const extract = (tag: string): string => {
     const regex = new RegExp(`===${tag}===\\s*([\\s\\S]*?)(?====\\w|$)`);
@@ -219,13 +328,15 @@ function parseGeneratedContent(
     metaTitle: metaTitle.substring(0, 60),
     metaDescription: metaDescription.substring(0, 160),
     weatherTriggered: true,
-    weatherWeek: forecast.weekRange,
+    weatherMode: context.mode,
+    weatherWeek: context.weekLabel,
     featuredImage: "",
+    serviceAreaFooterLinks: geoFooterLinks.slice(0, 10), // Top 10 for frontmatter
     schema: {
       type: "Article",
       faqItems,
     },
-    status: "draft",
+    status: "published", // Direct to main — no draft stage
   };
 
   // Compose the full Markdown file
@@ -233,7 +344,7 @@ function parseGeneratedContent(
   const markdownContent = `${frontmatterYaml}\n\n${content}`;
 
   const fileName = `${dateStr}-${slug}.md`;
-  const filePath = `content/posts/drafts/${fileName}`;
+  const filePath = `content/posts/${fileName}`;
 
   return {
     frontmatter,
@@ -250,6 +361,13 @@ function composeFrontmatterYaml(fm: BlogFrontmatter): string {
     )
     .join("\n");
 
+  const geoLinksYaml = fm.serviceAreaFooterLinks
+    .map(
+      (link) =>
+        `  - label: "${escapeYaml(link.label)}"\n    url: "${link.url}"`
+    )
+    .join("\n");
+
   return `---
 title: "${escapeYaml(fm.title)}"
 slug: "${fm.slug}"
@@ -260,8 +378,11 @@ tags: [${fm.tags.map((t) => `"${escapeYaml(t)}"`).join(", ")}]
 metaTitle: "${escapeYaml(fm.metaTitle)}"
 metaDescription: "${escapeYaml(fm.metaDescription)}"
 weatherTriggered: ${fm.weatherTriggered}
+weatherMode: "${fm.weatherMode}"
 weatherWeek: "${fm.weatherWeek}"
 featuredImage: "${fm.featuredImage}"
+serviceAreaFooterLinks:
+${geoLinksYaml}
 schema:
   type: "${fm.schema.type}"
   faqItems:
