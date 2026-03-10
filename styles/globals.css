@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-white text-brand-text;
+  }
+}
+
+@layer components {
+  /* Key Takeaway callout blocks — matches SOP requirement */
+  .key-takeaway {
+    @apply my-8 rounded-lg border-l-4 border-brand-orange bg-brand-orange-light p-6;
+  }
+
+  .key-takeaway strong:first-child {
+    @apply block mb-2 text-brand-dark text-lg;
+  }
+
+  /* Blog prose overrides */
+  .prose h2 {
+    @apply mt-10 mb-4;
+  }
+
+  .prose h3 {
+    @apply mt-8 mb-3;
+  }
+
+  .prose a {
+    @apply text-brand-orange underline decoration-brand-orange/30 hover:decoration-brand-orange transition-colors;
+  }
+
+  .prose blockquote {
+    @apply border-l-4 border-brand-orange bg-gray-50 py-1 px-4 italic;
+  }
+
+  .prose img {
+    @apply rounded-lg shadow-md;
+  }
+
+  /* FAQ section styling */
+  .faq-section details {
+    @apply border-b border-gray-200 py-4;
+  }
+
+  .faq-section details summary {
+    @apply cursor-pointer font-semibold text-brand-dark hover:text-brand-orange transition-colors list-none;
+  }
+
+  .faq-section details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .faq-section details[open] summary {
+    @apply mb-2 text-brand-orange;
+  }
+
+  /* CTA button */
+  .btn-primary {
+    @apply inline-block bg-brand-orange text-white font-semibold px-6 py-3 rounded-md hover:bg-brand-orange-hover transition-colors;
+  }
+
+  .btn-secondary {
+    @apply inline-block border-2 border-brand-orange text-brand-orange font-semibold px-6 py-3 rounded-md hover:bg-brand-orange hover:text-white transition-colors;
+  }
+}

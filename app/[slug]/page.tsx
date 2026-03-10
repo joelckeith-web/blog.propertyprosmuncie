@@ -1,0 +1,259 @@
+import { notFound } from "next/navigation";
+import { getAllPostSlugs, getPostBySlug, getRecentPosts } from "@/lib/blog";
+import {
+  ArticleSchema,
+  FaqSchema,
+  BreadcrumbSchema,
+} from "@/components/SchemaMarkup";
+import BlogCard from "@/components/BlogCard";
+import { siteConfig } from "@/lib/site-config";
+import type { Metadata } from "next";
+
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
+
+export async function generateStaticParams() {
+  const slugs = getAllPostSlugs();
+  return slugs.map((slug) => ({ slug }));
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
+
+  if (!post) {
+    return { title: "Post Not Found" };
+  }
+
+  return {
+    title: post.frontmatter.metaTitle || post.frontmatter.title,
+    description: post.frontmatter.metaDescription,
+    alternates: {
+      canonical: `/${post.slug}`,
+    },
+    openGraph: {
+      type: "article",
+      title: post.frontmatter.metaTitle || post.frontmatter.title,
+      description: post.frontmatter.metaDescription,
+      url: `${siteConfig.blogUrl}/${post.slug}`,
+      publishedTime: post.frontmatter.publishDate,
+      authors: [siteConfig.name],
+      tags: post.frontmatter.tags,
+      ...(post.frontmatter.featuredImage
+        ? { images: [post.frontmatter.featuredImage] }
+        : {}),
+    },
+  };
+}
+
+export default async function BlogPostPage({ params }: PageProps) {
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
+
+  if (!post) {
+    notFound();
+  }
+
+  const recentPosts = await getRecentPosts(3, slug);
+
+  return (
+    <>
+      {/* Schema markup */}
+      <ArticleSchema post={post} />
+      <FaqSchema items={post.frontmatter.schema?.faqItems || []} />
+      <BreadcrumbSchema
+        items={[
+          { name: "Home", url: siteConfig.url },
+          { name: "Blog", url: siteConfig.blogUrl },
+          {
+            name: post.frontmatter.title,
+            url: `${siteConfig.blogUrl}/${post.slug}`,
+          },
+        ]}
+      />
+
+      <article>
+        {/* Post header */}
+        <header className="bg-brand-dark text-white">
+          <div className="max-w-4xl mx-auto px-4 py-12 lg:py-16">
+            {/* Breadcrumb */}
+            <nav className="text-sm text-gray-400 mb-6">
+              <a
+                href={siteConfig.url}
+                className="hover:text-brand-orange transition-colors"
+              >
+                Home
+              </a>
+              <span className="mx-2">/</span>
+              <a
+                href="/"
+                className="hover:text-brand-orange transition-colors"
+              >
+                Blog
+              </a>
+              <span className="mx-2">/</span>
+              <span className="text-gray-300">{post.frontmatter.category}</span>
+            </nav>
+
+            {/* Meta info */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <span className="text-xs font-semibold bg-brand-orange px-3 py-1 rounded-full capitalize">
+                {post.frontmatter.category}
+              </span>
+              <time
+                dateTime={post.frontmatter.publishDate}
+                className="text-sm text-gray-300"
+              >
+                {new Date(post.frontmatter.publishDate).toLocaleDateString(
+                  "en-US",
+                  { month: "long", day: "numeric", year: "numeric" }
+                )}
+              </time>
+              <span className="text-sm text-gray-400">
+                · {post.readingTime}
+              </span>
+              {post.frontmatter.weatherTriggered && (
+                <span className="text-sm text-brand-orange">
+                  ⛅ Weather Report: {post.frontmatter.weatherWeek}
+                </span>
+              )}
+            </div>
+
+            {/* Title */}
+            <h1 className="text-3xl lg:text-4xl font-bold leading-tight">
+              {post.frontmatter.title}
+            </h1>
+          </div>
+        </header>
+
+        {/* Post content */}
+        <div className="max-w-4xl mx-auto px-4 py-10">
+          <div className="lg:flex lg:gap-12">
+            {/* Main content */}
+            <div className="lg:flex-1 min-w-0">
+              <div
+                className="prose prose-lg max-w-none"
+                dangerouslySetInnerHTML={{ __html: post.content }}
+              />
+
+              {/* FAQ section */}
+              {post.frontmatter.schema?.faqItems?.length > 0 && (
+                <section className="mt-12 pt-8 border-t border-gray-200">
+                  <h2 className="text-2xl font-bold text-brand-dark mb-6">
+                    Frequently Asked Questions
+                  </h2>
+                  <div className="faq-section space-y-1">
+                    {post.frontmatter.schema.faqItems.map((faq, index) => (
+                      <details key={index}>
+                        <summary className="py-4 text-base">
+                          {faq.question}
+                        </summary>
+                        <p className="pb-4 text-brand-dark-secondary leading-relaxed">
+                          {faq.answer}
+                        </p>
+                      </details>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* CTA */}
+              <div className="mt-12 bg-brand-orange-light rounded-lg p-8 text-center">
+                <h3 className="text-xl font-bold text-brand-dark mb-2">
+                  Ready to Protect Your Home?
+                </h3>
+                <p className="text-brand-dark-secondary mb-4">
+                  Contact {siteConfig.name} today for a free estimate on{" "}
+                  {post.frontmatter.category} services in{" "}
+                  {siteConfig.address.city}, {siteConfig.address.state}.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <a href={siteConfig.pages.contact} className="btn-primary">
+                    Get a Free Estimate
+                  </a>
+                  <a
+                    href={`tel:${siteConfig.phoneFormatted.replace(/\D/g, "")}`}
+                    className="btn-secondary"
+                  >
+                    Call {siteConfig.phone}
+                  </a>
+                </div>
+              </div>
+
+              {/* Tags */}
+              {post.frontmatter.tags?.length > 0 && (
+                <div className="mt-8 flex flex-wrap gap-2">
+                  {post.frontmatter.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <aside className="lg:w-72 shrink-0 mt-12 lg:mt-0">
+              <div className="sticky top-24 space-y-8">
+                {/* Contact card */}
+                <div className="bg-brand-dark text-white rounded-lg p-6">
+                  <h3 className="font-bold text-brand-orange mb-3">
+                    Need Help?
+                  </h3>
+                  <p className="text-sm text-gray-300 mb-4">
+                    Call us for a free consultation and estimate.
+                  </p>
+                  <a
+                    href={`tel:${siteConfig.phoneFormatted.replace(/\D/g, "")}`}
+                    className="block text-center btn-primary text-sm w-full"
+                  >
+                    {siteConfig.phone}
+                  </a>
+                </div>
+
+                {/* Services list */}
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h3 className="font-bold text-brand-dark mb-3">
+                    Our Services
+                  </h3>
+                  <ul className="space-y-2">
+                    {Object.values(siteConfig.services).map((service) => (
+                      <li key={service.url}>
+                        <a
+                          href={service.url}
+                          className="text-sm text-brand-dark-secondary hover:text-brand-orange transition-colors"
+                        >
+                          → {service.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </article>
+
+      {/* Related posts */}
+      {recentPosts.length > 0 && (
+        <section className="bg-gray-50 py-12">
+          <div className="max-w-7xl mx-auto px-4">
+            <h2 className="text-2xl font-bold text-brand-dark mb-8">
+              More From Our Blog
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {recentPosts.map((p) => (
+                <BlogCard key={p.slug} post={p} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
