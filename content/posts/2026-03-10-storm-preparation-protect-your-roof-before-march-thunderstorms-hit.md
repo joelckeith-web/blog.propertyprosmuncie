@@ -10,7 +10,7 @@ metaDescription: "Severe thunderstorms forecast March 12-16 in Muncie. Prepare y
 weatherTriggered: true
 weatherMode: "pre-event"
 weatherWeek: "March 10–March 16, 2026"
-featuredImage: ""
+featuredImage: "https://images.pexels.com/photos/34959209/pexels-photo-34959209.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
 serviceAreaFooterLinks:
   - label: "Roofing in Muncie's Near Northside"
     url: "https://www.propertyprosmuncie.com/roofing/"

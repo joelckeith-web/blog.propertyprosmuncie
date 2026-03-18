@@ -10,7 +10,7 @@ metaDescription: "60 MPH winds hit Muncie, now freeze-thaw cycles threaten compr
 weatherTriggered: true
 weatherMode: "combined"
 weatherWeek: "March 18–March 24, 2026"
-featuredImage: ""
+featuredImage: "https://images.pexels.com/photos/34610697/pexels-photo-34610697.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
 serviceAreaFooterLinks:
   - label: "Roofing in Muncie's Near Northside"
     url: "https://www.propertyprosmuncie.com/roofing/"
