@@ -94,4 +94,4 @@ export async function GET(request: NextRequest) {
 
 // Vercel cron requires GET method
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // Allow up to 60s for API calls
+export const maxDuration = 300; // Vercel Pro allows up to 300s — needed for NWS + Claude + GitHub chain
