@@ -132,6 +132,18 @@ export default async function BlogPostPage({ params }: PageProps) {
           </div>
         </header>
 
+        {/* Featured image hero */}
+        {post.frontmatter.featuredImage && (
+          <div className="max-w-4xl mx-auto px-4 pt-8">
+            <img
+              src={post.frontmatter.featuredImage}
+              alt={post.frontmatter.title}
+              className="w-full h-64 md:h-96 object-cover rounded-lg"
+              loading="lazy"
+            />
+          </div>
+        )}
+
         {/* Post content */}
         <div className="max-w-4xl mx-auto px-4 py-10">
           <div className="lg:flex lg:gap-12">

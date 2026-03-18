@@ -20,9 +20,16 @@ export default function BlogCard({ post }: { post: BlogPost }) {
 
   return (
     <article className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow group">
-      {/* Featured image placeholder */}
+      {/* Featured image or gradient placeholder */}
       <div className="h-48 bg-gradient-to-br from-brand-dark to-brand-dark-secondary flex items-center justify-center">
-        {frontmatter.weatherTriggered && (
+        {frontmatter.featuredImage ? (
+          <img
+            src={frontmatter.featuredImage}
+            alt={frontmatter.title}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : frontmatter.weatherTriggered ? (
           <div className="text-center text-white">
             <svg
               className="w-12 h-12 mx-auto mb-2 opacity-50"
@@ -39,7 +46,7 @@ export default function BlogCard({ post }: { post: BlogPost }) {
             </svg>
             <span className="text-xs opacity-60">Weather Report</span>
           </div>
-        )}
+        ) : null}
       </div>
 
       <div className="p-6">

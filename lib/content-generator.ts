@@ -7,6 +7,7 @@ import type {
   ServiceAreaLink,
 } from "./types";
 import { siteConfig } from "./site-config";
+import { fetchFeaturedImage } from "./images";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -46,6 +47,19 @@ export async function generateBlogPost(
 
   // Parse the structured response
   const parsed = parseGeneratedContent(rawContent, context, primaryService, geoFooterLinks);
+
+  // Fetch featured image from Pexels (non-blocking — empty string on failure)
+  const featuredImage = await fetchFeaturedImage(
+    parsed.frontmatter.category,
+    context.dominantHazard
+  );
+  if (featuredImage) {
+    parsed.frontmatter.featuredImage = featuredImage;
+    // Re-compose markdown with updated frontmatter
+    const updatedYaml = composeFrontmatterYaml(parsed.frontmatter);
+    const contentOnly = parsed.markdownContent.split("---").slice(2).join("---");
+    parsed.markdownContent = `${updatedYaml}${contentOnly}`;
+  }
 
   return parsed;
 }
